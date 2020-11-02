@@ -12,7 +12,6 @@ use OpenApi\Annotations\Items;
 use OpenApi\Annotations\Property;
 use OpenApi\Annotations\Schema;
 use OpenApi\Context;
-use OpenApi\Util;
 
 /**
  * Use the property context to extract useful information and inject that into the annotation.
@@ -44,11 +43,12 @@ class AugmentProperties
     public function __invoke(Analysis $analysis)
     {
         $refs = [];
+        $default_type = "";
         if ($analysis->openapi->components !== UNDEFINED && $analysis->openapi->components->schemas !== UNDEFINED) {
             foreach ($analysis->openapi->components->schemas as $schema) {
                 if ($schema->schema !== UNDEFINED) {
                     $refs[strtolower($schema->_context->fullyQualifiedName($schema->_context->class))]
-                        = Components::SCHEMA_REF.Util::refEncode($schema->schema);
+                        = Components::SCHEMA_REF.$schema->schema;
                 }
             }
         }
@@ -56,6 +56,7 @@ class AugmentProperties
         $allProperties = $analysis->getAnnotationsOfType(Property::class);
         foreach ($allProperties as $property) {
             $context = $property->_context;
+            $defined_type = "";
             // Use the property names for @OA\Property()
             if ($property->property === UNDEFINED) {
                 $property->property = $context->property;
@@ -64,6 +65,11 @@ class AugmentProperties
                 continue;
             }
             $comment = str_replace("\r\n", "\n", (string) $context->comment);
+
+            if($property->type !== UNDEFINED){
+                $defined_type = $property->type;
+            }
+
             if ($property->type === UNDEFINED && $context->type && $context->type !== UNDEFINED) {
                 if ($context->nullable === true) {
                     $property->nullable = true;
@@ -83,9 +89,11 @@ class AugmentProperties
                     preg_match('/^([^\[]+)(.*$)/', trim($varMatches['type']), $typeMatches);
                     $isNullable = $this->isNullable($typeMatches[1]);
                     $type = $this->stripNull($typeMatches[1]);
+                    $default_type = $type;
                     if (array_key_exists(strtolower($type), static::$types) === false) {
                         $key = strtolower($context->fullyQualifiedName($type));
-                        if ($property->ref === UNDEFINED && $typeMatches[2] === '' && array_key_exists($key, $refs)) {
+                        if ($property->ref === UNDEFINED && $typeMatches[2] === '' && array_key_exists($key, $refs) && $property->set_default === true) {
+                            unset($property->set_default);
                             if ($isNullable) {
                                 $property->oneOf = [
                                     new Schema([
@@ -111,6 +119,7 @@ class AugmentProperties
                     }
                     if ($typeMatches[2] === '[]') {
                         if ($property->items === UNDEFINED) {
+
                             $property->items = new Items(
                                 [
                                     'type' => $property->type,
@@ -140,6 +149,16 @@ class AugmentProperties
             if ($property->description === UNDEFINED) {
                 $property->description = $context->phpdocContent();
             }
+
+            if($property->set_default === UNDEFINED){
+                if($defined_type !== ""){
+                    $this->applyDedault($property, $defined_type, $property->description);
+                }
+                else{
+                    $this->applyDedault($property, $default_type, $property->description);
+                }
+            }
+
         }
     }
 
@@ -187,6 +206,28 @@ class AugmentProperties
             ];
         } else {
             $property->ref = $ref;
+        }
+    }
+
+    protected function applyDedault(Property $property, $type, $description)
+    {
+
+        $tmp_description= str_replace("\n", ". ", $description);
+
+        if(strpos(strval($type), "App")){
+            $type_trim = explode("\\", $type);
+            $type = $type_trim[4];
+        }
+
+        if(strpos(strval($description), "<br>")){
+            $tmp_description = str_replace("<br>", "", $tmp_description);
+            $tmp_description = str_replace(":", "", $tmp_description);
+        }
+
+        if($type === 'array'){
+            $property->default = "<".$type."><".$property->items->type."> ".$tmp_description.".";
+        } else{
+            $property->default = "<".$type."> ".$tmp_description.".";
         }
     }
 }

@@ -19,6 +19,13 @@ class Property extends Schema
     public $property = UNDEFINED;
 
     /**
+     * If set to true the default value of the property will not be added.
+     *
+     * @var boolean
+     */
+    public $set_default = UNDEFINED;
+
+    /**
      * {@inheritdoc}
      */
     public static $_parents = [
