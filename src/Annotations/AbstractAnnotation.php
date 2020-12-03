@@ -398,7 +398,7 @@ abstract class AbstractAnnotation implements \JsonSerializable
         }
         if (property_exists($this, 'ref') && $this->ref !== UNDEFINED) {
             if($this->ref == null){
-                Logger::error($this->identity().' in '.$this->_context." is null.");
+                Logger::warning($this->identity().' in '.$this->_context." is null.");
             }
             if (substr($this->ref, 0, 2) === '#/' && count($parents) > 0 && $parents[0] instanceof OpenApi) {
                 // Internal reference
