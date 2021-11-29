@@ -150,14 +150,14 @@ class AugmentProperties
                 $property->description = $context->phpdocContent();
             }
 
-            if($property->set_default === UNDEFINED){
+            /*if($property->set_default === UNDEFINED){
                 if($defined_type !== ""){
                     $this->applyDedault($property, $defined_type, $property->description);
                 }
                 else{
                     $this->applyDedault($property, $default_type, $property->description);
                 }
-            }
+            }*/
 
         }
     }
